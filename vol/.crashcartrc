@@ -1,0 +1,2 @@
+CART=/dev/crashcart
+export PATH=$CART/sbin:$CART/bin:$PATH

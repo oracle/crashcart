@@ -1,0 +1,15 @@
+bash-interactive
+bzip2
+coreutils
+curl
+gdb
+gnutar
+gzip
+ltrace
+man
+netcat-gnu
+openssl
+pigz
+strace
+tcpdump
+wget
