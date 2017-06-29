@@ -36,7 +36,7 @@ use std::ffi::CString;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
-fn print_usage(program: &str, opts: Options) {
+fn print_usage(program: &str, opts: &Options) {
     let brief = format!("Usage: {} [options] ID [--] [CMD]", program);
     print!("{}", opts.usage(&brief));
 }
@@ -111,7 +111,7 @@ fn make_device(image: &str) -> Result<i32> {
             if !is_backing(devnr, image) {
                 remove_file(&link)
                     .chain_err(|| format!("could not delete {}", link))?;
-                return mount_image(&image, &link);
+                return mount_image(image, &link);
             };
             info!("{} is backed to /dev/loop{}", image, devnr);
             Ok(devnr)
@@ -121,7 +121,7 @@ fn make_device(image: &str) -> Result<i32> {
                 let msg = format!("could not read {}", image);
                 Err(e).chain_err(|| msg)
             } else {
-                mount_image(&image, &link)
+                mount_image(image, &link)
             }
         }
     }
@@ -211,7 +211,7 @@ fn enter_namespaces(pid: u64, namespaces: CloneFlags) -> Result<()> {
             }
         }
     }
-    for &(space, fd) in to_enter.iter() {
+    for &(space, fd) in &to_enter {
         setns(fd, space)
             .chain_err(|| "failed to enter")?;
         close(fd).unwrap();
@@ -274,7 +274,7 @@ fn find_root(path: &str) -> Result<u32> {
     };
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    for ref line in contents.split("\n") {
+    for line in contents.split('\n') {
         let words: Vec<&str> = line.trim().split_whitespace().collect();
         if words.len() < 2 {
             continue;
@@ -353,7 +353,7 @@ const CC_LOOP_TMP: &'static str = "/dev/cc-loop";
 const CC_MOUNT_PATH: &'static str = "/dev/crashcart";
 
 fn do_mount(pid: u64, image: &str) -> Result<()> {
-    let devnr = make_device(&image)?;
+    let devnr = make_device(image)?;
     // if we are in a userns, make sure that we have the right fsids
     let reset_fsids = set_fsids(pid)?;
     defer!(reset_fsids());
@@ -432,10 +432,11 @@ const DEFAULT_ARGS: &'static [&'static str] = &[
 ];
 
 fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
-    let mut a = args;
-    if args.is_empty() {
-        a = &DEFAULT_ARGS[..];
-    }
+    let a = if args.is_empty() {
+        &DEFAULT_ARGS[..]
+    } else {
+        args
+    };
     if !docker_id.is_empty() {
         let mut all = Vec::new();
         all.push(CString::new("docker").unwrap());
@@ -570,7 +571,7 @@ fn do_unmount(pid: u64, image: &str) -> Result<()> {
         Ok(m) => {
             let devnr = m.to_str().unwrap()["/dev/loop".len()..]
                 .parse::<i32>().unwrap();
-            if is_backing(devnr, &image) {
+            if is_backing(devnr, image) {
                 do_unmount_ns(pid, devnr)?;
             };
         },
@@ -617,7 +618,7 @@ fn main() {
 
 fn run() -> Result<()> {
     let args: Vec<String> = env::args().collect();
-    let ref program = args[0];
+    let program = &args[0];
 
     let mut opts = Options::new();
     opts.optopt("i", "image", "image to mount <crashcart.img>", "IMAGE");
@@ -634,7 +635,7 @@ fn run() -> Result<()> {
     if matches.opt_present("h") {
         println!("crashcart - mount crashcart image in container");
         println!("");
-        print_usage(&program, opts);
+        print_usage(program, &opts);
         return Ok(());
     }
 
@@ -643,23 +644,24 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    let mut level = log::LogLevelFilter::Info;
-
-    if matches.opt_present("v") {
-        level = log::LogLevelFilter::Debug;
-    }
+    let level = if matches.opt_present("v") {
+        log::LogLevelFilter::Debug
+    } else {
+        log::LogLevelFilter::Info
+    };
 
     let _ = log::set_logger(|max_log_level| {
         max_log_level.set(level);
         Box::new(logger::SimpleLogger)
     });
 
-    let image = matches.opt_str("i").unwrap_or("crashcart.img".to_string());
+    let image = matches.opt_str("i")
+        .unwrap_or_else(|| "crashcart.img".to_string());
 
     let id = if !matches.free.is_empty() {
         matches.free[0].clone()
     } else {
-        print_usage(&program, opts);
+        print_usage(program, &opts);
         return Ok(());
     };
 
@@ -668,15 +670,17 @@ fn run() -> Result<()> {
         do_mount(pid, &image)?;
     }
 
-    let mut exit_code = 0;
-    if !matches.opt_present("u") && !matches.opt_present("m") {
+    let exit_code = if !matches.opt_present("u") && !matches.opt_present("m") {
         let a: Vec<&str> = matches.free.iter().map(AsRef::as_ref).collect();
-        let mut docker_id = String::new();
-        if matches.opt_present("e") {
-            docker_id = id;
-        }
-        exit_code = do_exec(pid, &docker_id, &a[1..])?;
-    }
+        let docker_id = if matches.opt_present("e") {
+            id
+        } else {
+            String::new()
+        };
+        do_exec(pid, &docker_id, &a[1..])?
+    } else {
+        0
+    };
 
 
     if !matches.opt_present("m") {
