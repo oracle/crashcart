@@ -1,4 +1,7 @@
-# `crashcart` - sideload binaries into a running container #
+# `crashcart` - microcontainer debugging tool #
+
+![crashcart](https://github.com/oracle/crashcart/raw/master/crashcart.png
+"crashcart")
 
 ## What is `crashcart`? ##
 
