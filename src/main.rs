@@ -1,11 +1,14 @@
 extern crate caps;
-#[macro_use] extern crate error_chain;
+#[macro_use]
+extern crate error_chain;
 extern crate getopts;
 extern crate glob;
 extern crate libc;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate nix;
-#[macro_use] extern crate scopeguard;
+#[macro_use]
+extern crate scopeguard;
 
 mod errors;
 mod logger;
@@ -46,14 +49,13 @@ fn mount_image(image: &str, link: &str) -> Result<i32> {
     // get free loop device
     let cfd = open("/dev/loop-control", OFlag::empty(), Mode::empty())
         .chain_err(|| "failed to open /dev/loop-control")?;
-    let devnr = loopback::loop_ctl_get_free(cfd)
-        .chain_err(|| "failed to get free device")?;
+    let devnr = loopback::loop_ctl_get_free(cfd).chain_err(|| "failed to get free device")?;
     defer!(close(cfd).unwrap());
 
     // set backing file for loop device to image
     let lp = format!("/dev/loop{}", devnr);
-    let lfd = open(&*lp, OFlag::empty(), Mode::empty())
-        .chain_err(|| format!("failed to open {}", lp))?;
+    let lfd =
+        open(&*lp, OFlag::empty(), Mode::empty()).chain_err(|| format!("failed to open {}", lp))?;
     defer!(close(lfd).unwrap());
 
     let ifd = open(image, OFlag::empty(), Mode::empty())
@@ -63,8 +65,7 @@ fn mount_image(image: &str, link: &str) -> Result<i32> {
     loopback::loop_set_fd(lfd, ifd)
         .chain_err(|| format!("failed to set backing file to {}", image))?;
 
-    symlink(&lp, &link)
-        .chain_err(|| format!("failed to symlink from {} to {}", link, lp))?;
+    symlink(&lp, &link).chain_err(|| format!("failed to symlink from {} to {}", link, lp))?;
 
     info!("backed /dev/loop{} to {}", devnr, image);
     Ok(devnr)
@@ -107,15 +108,15 @@ fn make_device(image: &str) -> Result<i32> {
     match read_link(&link) {
         Ok(m) => {
             let devnr = m.to_str().unwrap()["/dev/loop".len()..]
-                .parse::<i32>().unwrap();
+                .parse::<i32>()
+                .unwrap();
             if !is_backing(devnr, image) {
-                remove_file(&link)
-                    .chain_err(|| format!("could not delete {}", link))?;
+                remove_file(&link).chain_err(|| format!("could not delete {}", link))?;
                 return mount_image(image, &link);
             };
             info!("{} is backed to /dev/loop{}", image, devnr);
             Ok(devnr)
-        },
+        }
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
                 let msg = format!("could not read {}", image);
@@ -127,10 +128,8 @@ fn make_device(image: &str) -> Result<i32> {
     }
 }
 
-const PID_GLOBS: &'static [&'static str] = &[
-    "/var/run/docker/libcontainerd/containerd/{}*/init/pid",
-    "/var/lib/rkt/pods/run/{}*/pid",
-];
+const PID_GLOBS: &'static [&'static str] = &["/var/run/docker/libcontainerd/containerd/{}*/init/pid",
+                                             "/var/lib/rkt/pods/run/{}*/pid"];
 
 fn get_pid(id: &str) -> Result<u64> {
     // NOTE: An alternative option for finding docker pids is to find the
@@ -139,7 +138,7 @@ fn get_pid(id: &str) -> Result<u64> {
     // /sys/fs/cgroup/memory/docker/*/tasks
     let mut out = id.to_owned();
     let mut pid_file = String::new();
-    for entry in PID_GLOBS{
+    for entry in PID_GLOBS {
         let results = glob(&entry.replace("{}", id))
             .chain_err(|| format!("invalid glob for id {}", id))?
             .map(|s| s.unwrap().to_str().unwrap().to_string())
@@ -152,8 +151,7 @@ fn get_pid(id: &str) -> Result<u64> {
     }
     if !pid_file.is_empty() {
         info!("Found pid_file at {}", pid_file);
-        let mut f = File::open(&pid_file)
-            .chain_err(|| format!("could not open {}", pid_file))?;
+        let mut f = File::open(&pid_file).chain_err(|| format!("could not open {}", pid_file))?;
         out = String::new();
         f.read_to_string(&mut out)
             .chain_err(|| format!("could not read {}", pid_file))?;
@@ -162,15 +160,13 @@ fn get_pid(id: &str) -> Result<u64> {
         .chain_err(|| format!("{} is not a valid pid", out))
 }
 
-const NAMESPACES: &[(CloneFlags, &'static str)] = &[
-    (CLONE_NEWIPC, "ipc"),
-    (CLONE_NEWUTS, "uts"),
-    (CLONE_NEWNET, "net"),
-    (CLONE_NEWPID, "pid"),
-    (CLONE_NEWNS, "mnt"),
-    (CLONE_NEWCGROUP, "cgroup"),
-    (CLONE_NEWUSER, "user"),
-];
+const NAMESPACES: &[(CloneFlags, &'static str)] = &[(CLONE_NEWIPC, "ipc"),
+                                                    (CLONE_NEWUTS, "uts"),
+                                                    (CLONE_NEWNET, "net"),
+                                                    (CLONE_NEWPID, "pid"),
+                                                    (CLONE_NEWNS, "mnt"),
+                                                    (CLONE_NEWCGROUP, "cgroup"),
+                                                    (CLONE_NEWUSER, "user")];
 
 fn enter_namespaces(pid: u64, namespaces: CloneFlags) -> Result<()> {
     let mut to_enter = Vec::new();
@@ -185,11 +181,10 @@ fn enter_namespaces(pid: u64, namespaces: CloneFlags) -> Result<()> {
                     }
                     let msg = format!("failed to open {}", oldpath);
                     return Err(e).chain_err(|| msg)?;
-                },
+                }
                 Ok(fd) => fd,
             };
-            let stat = fstat(oldfd)
-                .chain_err(|| "failed to stat")?;
+            let stat = fstat(oldfd).chain_err(|| "failed to stat")?;
             close(oldfd).unwrap();
             let newpath = format!("/proc/{}/ns/{}", pid, name);
             let fd = match open(&*newpath, OFlag::empty(), Mode::empty()) {
@@ -199,11 +194,10 @@ fn enter_namespaces(pid: u64, namespaces: CloneFlags) -> Result<()> {
                     }
                     let msg = format!("failed to open {}", oldpath);
                     return Err(e).chain_err(|| msg);
-                },
+                }
                 Ok(fd) => fd,
             };
-            let nstat = fstat(fd)
-                .chain_err(|| "failed to stat")?;
+            let nstat = fstat(fd).chain_err(|| "failed to stat")?;
             if stat.st_dev == nstat.st_dev && stat.st_ino == nstat.st_ino {
                 close(fd).unwrap();
             } else {
@@ -212,14 +206,11 @@ fn enter_namespaces(pid: u64, namespaces: CloneFlags) -> Result<()> {
         }
     }
     for &(space, fd) in &to_enter {
-        setns(fd, space)
-            .chain_err(|| "failed to enter")?;
+        setns(fd, space).chain_err(|| "failed to enter")?;
         close(fd).unwrap();
         if space == CLONE_NEWUSER {
-            setresgid(0, 0, 0)
-                .chain_err(|| "failed to setgid")?;
-            setresuid(0, 0, 0)
-                .chain_err(|| "failed to setuid")?;
+            setresgid(0, 0, 0).chain_err(|| "failed to setgid")?;
+            setresuid(0, 0, 0).chain_err(|| "failed to setuid")?;
         }
     }
     Ok(())
@@ -231,16 +222,12 @@ fn enter_mount_ns(pid: u64) -> Result<Box<(Fn() -> Result<()>)>> {
         .chain_err(|| format!("failed to open {}", origpath))?;
 
     // enter ns and return closure to reset
-    let cwd = env::current_dir()
-        .chain_err(|| "failed to get cwd")?;
+    let cwd = env::current_dir().chain_err(|| "failed to get cwd")?;
     enter_namespaces(pid, CLONE_NEWNS)?;
     Ok(Box::new(move || {
-        setns(ofd, CLONE_NEWNS)
-            .chain_err(|| "failed to setns")?;
-        close(ofd)
-            .chain_err(|| format!("failed to close {}", origpath))?;
-        env::set_current_dir(&cwd)
-            .chain_err(|| "failed to set cwd")?;
+        setns(ofd, CLONE_NEWNS).chain_err(|| "failed to setns")?;
+        close(ofd).chain_err(|| format!("failed to close {}", origpath))?;
+        env::set_current_dir(&cwd).chain_err(|| "failed to set cwd")?;
         Ok(())
     }))
 }
@@ -253,10 +240,8 @@ fn enter_pid_ns(pid: u64) -> Result<Box<(Fn() -> Result<()>)>> {
     // enter ns and return closure to reset
     enter_namespaces(pid, CLONE_NEWPID)?;
     Ok(Box::new(move || {
-        setns(ofd, CLONE_NEWPID)
-            .chain_err(|| "failed to setns")?;
-        close(ofd)
-            .chain_err(|| format!("failed to close {}", origpath))?;
+        setns(ofd, CLONE_NEWPID).chain_err(|| "failed to setns")?;
+        close(ofd).chain_err(|| format!("failed to close {}", origpath))?;
         Ok(())
     }))
 }
@@ -265,11 +250,11 @@ fn find_root(path: &str) -> Result<u32> {
     let mut file = match File::open(path) {
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
-             return Ok(0);
+                return Ok(0);
             }
             let msg = format!("failed to open {}", path);
             return Err(e).chain_err(|| msg);
-        },
+        }
         Ok(f) => f,
     };
     let mut contents = String::new();
@@ -303,13 +288,10 @@ fn set_fsids(pid: u64) -> Result<Box<(Fn() -> ())>> {
     for c in caps::Capability::iter_variants() {
         all.insert(c);
     }
-    caps::set(None, caps::CapSet::Effective, all)
-        .chain_err(|| "failed to set capabilities")?;
-    Ok(Box::new(|| {
-        unsafe {
-            libc::setfsgid(0);
-            libc::setfsuid(0);
-        }
+    caps::set(None, caps::CapSet::Effective, all).chain_err(|| "failed to set capabilities")?;
+    Ok(Box::new(|| unsafe {
+        libc::setfsgid(0);
+        libc::setfsuid(0);
     }))
 }
 
@@ -320,17 +302,16 @@ fn is_mounted(path: &str) -> Result<bool> {
                 return Ok(false);
             }
             let msg = format!("failed to open {}", path);
-            return Err(e).chain_err(|| msg)
-        },
+            return Err(e).chain_err(|| msg);
+        }
         Ok(fd) => fd,
     };
-    let stat = fstat(fd)
-        .chain_err(|| "failed to stat")?;
+    let stat = fstat(fd).chain_err(|| "failed to stat")?;
     close(fd).unwrap();
     let ppath = match Path::new(path).parent() {
         None => {
             return Ok(false);
-        },
+        }
         Some(p) => p,
     };
     let pfd = match open(ppath, OFlag::empty(), Mode::empty()) {
@@ -340,11 +321,10 @@ fn is_mounted(path: &str) -> Result<bool> {
             }
             let msg = format!("failed to open {:?}", ppath);
             return Err(e).chain_err(|| msg);
-        },
+        }
         Ok(fd) => fd,
     };
-    let pstat = fstat(pfd)
-        .chain_err(|| "failed to stat")?;
+    let pstat = fstat(pfd).chain_err(|| "failed to stat")?;
     close(fd).unwrap();
     Ok(stat.st_dev != pstat.st_dev)
 }
@@ -369,41 +349,37 @@ fn do_mount(pid: u64, image: &str) -> Result<()> {
     //       loopback devices, so we create a new tmpfs mount from the
     //       init_user_ns to hold the device
     if !is_mounted(CC_LOOP_TMP)? {
-        create_dir_all(CC_LOOP_TMP)
-            .chain_err(|| format!("failed to create {}", CC_LOOP_TMP))?;
+        create_dir_all(CC_LOOP_TMP).chain_err(|| format!("failed to create {}", CC_LOOP_TMP))?;
         if let Err(e) = mount(Some("tmpfs"),
-            CC_LOOP_TMP,
-            Some("tmpfs"),
-            MsFlags::empty(),
-            None::<&str>) {
+                              CC_LOOP_TMP,
+                              Some("tmpfs"),
+                              MsFlags::empty(),
+                              None::<&str>) {
             if e.errno() != Errno::EBUSY {
-                let msg = format!("could not mount tmpfs to {}",
-                       CC_LOOP_TMP);
+                let msg = format!("could not mount tmpfs to {}", CC_LOOP_TMP);
                 Err(e).chain_err(|| msg)?;
             }
         }
     }
     let ccimage = format!("{}/loop{}", CC_LOOP_TMP, devnr);
     if let Err(e) = mknod(&*ccimage,
-        S_IFBLK,
-        Mode::from_bits_truncate(0o660),
-        loopback::loopdev(devnr)) {
+                          S_IFBLK,
+                          Mode::from_bits_truncate(0o660),
+                          loopback::loopdev(devnr)) {
         if e.errno() != Errno::EEXIST {
             let msg = format!("could not mknod {}", ccimage);
             Err(e).chain_err(|| msg)?;
         }
     }
     if !is_mounted(CC_MOUNT_PATH)? {
-        create_dir_all(CC_MOUNT_PATH)
-            .chain_err(|| format!("failed to create {}", CC_MOUNT_PATH))?;
+        create_dir_all(CC_MOUNT_PATH).chain_err(|| format!("failed to create {}", CC_MOUNT_PATH))?;
         if let Err(e) = mount(Some(&*ccimage),
-            CC_MOUNT_PATH,
-            Some("ext3"),
-            MS_RDONLY,
-            None::<&str>) {
+                              CC_MOUNT_PATH,
+                              Some("ext3"),
+                              MS_RDONLY,
+                              None::<&str>) {
             if e.errno() != Errno::EBUSY {
-                let msg = format!("could not mount {} to {}",
-                       ccimage, CC_MOUNT_PATH);
+                let msg = format!("could not mount {} to {}", ccimage, CC_MOUNT_PATH);
                 Err(e).chain_err(|| msg)?;
             }
         }
@@ -414,7 +390,7 @@ fn do_mount(pid: u64, image: &str) -> Result<()> {
 
 static mut CHILD_PID: i32 = 0;
 
-extern fn signal_handler(signo: c_int) {
+extern "C" fn signal_handler(signo: c_int) {
     // the unsafe is due to usage of CHILD_PID, although it is safe to use it
     // as mentioned below.
     unsafe {
@@ -424,12 +400,8 @@ extern fn signal_handler(signo: c_int) {
     }
 }
 
-const DEFAULT_ARGS: &'static [&'static str] = &[
-    "/dev/crashcart/bin/bash",
-    "--rcfile",
-    "/dev/crashcart/.crashcartrc",
-    "-i",
-];
+const DEFAULT_ARGS: &'static [&'static str] =
+    &["/dev/crashcart/bin/bash", "--rcfile", "/dev/crashcart/.crashcartrc", "-i"];
 
 fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
     let a = if args.is_empty() {
@@ -442,13 +414,12 @@ fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
         all.push(CString::new("docker").unwrap());
         all.push(CString::new("exec").unwrap());
         all.push(CString::new("-it").unwrap());
-        all.push(CString::new(docker_id.to_string())
-                 .chain_err(|| "invalid docker id")?);
+        all.push(CString::new(docker_id.to_string()).chain_err(|| "invalid docker id")?);
         let mut other: Vec<CString> = a.iter()
-            .map(|s| CString::new(s.to_string()).unwrap()).collect();
+            .map(|s| CString::new(s.to_string()).unwrap())
+            .collect();
         all.append(&mut other);
-        execvp(&all[0], &all)
-            .chain_err(|| "failed to exec")?;
+        execvp(&all[0], &all).chain_err(|| "failed to exec")?;
     }
 
     // enter pid namespace before fork
@@ -458,16 +429,16 @@ fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
         ForkResult::Child => {
             // enter remaining namespaces
             enter_namespaces(pid,
-                CLONE_NEWUSER|CLONE_NEWIPC|CLONE_NEWUTS|
-                CLONE_NEWNS|CLONE_NEWCGROUP|CLONE_NEWNET)?;
+                             CLONE_NEWUSER | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWNS |
+                             CLONE_NEWCGROUP | CLONE_NEWNET)?;
             // child execs parameters or execs docker_exec
             let all: Vec<CString> = a.iter()
-                .map(|s| CString::new(s.to_string()).unwrap()).collect();
-            execvp(&all[0], &all)
-                .chain_err(|| "failed to exec")?;
+                .map(|s| CString::new(s.to_string()).unwrap())
+                .collect();
+            execvp(&all[0], &all).chain_err(|| "failed to exec")?;
             Ok(-1)
-        },
-        ForkResult::Parent{child} => {
+        }
+        ForkResult::Parent { child } => {
             // parent waits for child to exit, passing along signals
             unsafe {
                 // NOTE: the child pid is only set once prior to setting up the
@@ -477,18 +448,12 @@ fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
                 let a = SigAction::new(SigHandler::Handler(signal_handler),
                                        SaFlags::empty(),
                                        SigSet::all());
-                sigaction(Signal::SIGTERM, &a)
-                    .chain_err(|| "failed to sigaction")?;
-                sigaction(Signal::SIGQUIT, &a)
-                    .chain_err(|| "failed to sigaction")?;
-                sigaction(Signal::SIGINT, &a)
-                    .chain_err(|| "failed to sigaction")?;
-                sigaction(Signal::SIGHUP, &a)
-                    .chain_err(|| "failed to sigaction")?;
-                sigaction(Signal::SIGUSR1, &a)
-                    .chain_err(|| "failed to sigaction")?;
-                sigaction(Signal::SIGUSR2, &a)
-                    .chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGTERM, &a).chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGQUIT, &a).chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGINT, &a).chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGHUP, &a).chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGUSR1, &a).chain_err(|| "failed to sigaction")?;
+                sigaction(Signal::SIGUSR2, &a).chain_err(|| "failed to sigaction")?;
             }
             let mut exit_code = -1;
             while exit_code == -1 {
@@ -500,25 +465,20 @@ fn do_exec(pid: u64, docker_id: &str, args: &[&str]) -> Result<i32> {
                             Err(e).chain_err(|| msg)?;
                         }
                         WaitStatus::StillAlive
-                    },
+                    }
                     Ok(result) => result,
 
                 };
                 match result {
-                    WaitStatus::Exited(_, code) => {
-                        exit_code = code as i32
-                    },
-                    WaitStatus::Signaled(_, signal, _) => {
-                        exit_code = signal as i32 + 128
-                    },
+                    WaitStatus::Exited(_, code) => exit_code = code as i32,
+                    WaitStatus::Signaled(_, signal, _) => exit_code = signal as i32 + 128,
                     _ => (),
                 };
-            };
+            }
             // reset pid namespace
-            exit_pid_ns()
-                .chain_err(|| "failed to exit pid ns")?;
+            exit_pid_ns().chain_err(|| "failed to exit pid ns")?;
             Ok(exit_code)
-        },
+        }
     }
 }
 
@@ -532,8 +492,7 @@ fn do_unmount_ns(pid: u64, devnr: i32) -> Result<()> {
     let ccimage = format!("{}/loop{}", CC_LOOP_TMP, devnr);
     if let Err(e) = umount(CC_MOUNT_PATH) {
         if e.errno() != Errno::ENOENT {
-            let msg = format!("could not unmount {} from {}",
-                   ccimage, CC_MOUNT_PATH);
+            let msg = format!("could not unmount {} from {}", ccimage, CC_MOUNT_PATH);
             Err(e).chain_err(|| msg)?;
         }
     }
@@ -551,8 +510,7 @@ fn do_unmount_ns(pid: u64, devnr: i32) -> Result<()> {
     }
     if let Err(e) = umount(CC_LOOP_TMP) {
         if e.errno() != Errno::ENOENT {
-            let msg = format!("could not unmount tmpfs from {}",
-                   CC_LOOP_TMP);
+            let msg = format!("could not unmount tmpfs from {}", CC_LOOP_TMP);
             Err(e).chain_err(|| msg)?;
         }
     }
@@ -570,11 +528,12 @@ fn do_unmount(pid: u64, image: &str) -> Result<()> {
     match read_link(&link) {
         Ok(m) => {
             let devnr = m.to_str().unwrap()["/dev/loop".len()..]
-                .parse::<i32>().unwrap();
+                .parse::<i32>()
+                .unwrap();
             if is_backing(devnr, image) {
                 do_unmount_ns(pid, devnr)?;
             };
-        },
+        }
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
                 let msg = format!("could not read {}", image);

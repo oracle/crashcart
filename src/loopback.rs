@@ -24,8 +24,7 @@ pub fn loop_set_fd(fd: RawFd, source: RawFd) -> Result<()> {
 }
 
 pub fn makedev(major: u64, minor: u64) -> u64 {
-    (minor & 0xff) | ((major & 0xfff) << 8) |
-        ((minor & !0xff) << 12) | ((major & !0xfff) << 32)
+    (minor & 0xff) | ((major & 0xfff) << 8) | ((minor & !0xff) << 12) | ((major & !0xfff) << 32)
 }
 
 pub fn loopdev(devnr: i32) -> u64 {
