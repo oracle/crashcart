@@ -273,8 +273,8 @@ fn find_root(path: &str) -> Result<u32> {
 }
 
 fn set_fsids(pid: u64) -> Result<Box<(Fn() -> ())>> {
-    let uid = find_root(&format!{"/proc/{}/uid_map", pid})?;
-    let gid = find_root(&format!{"/proc/{}/gid_map", pid})?;
+    let uid = find_root(&format!("/proc/{}/uid_map", pid))?;
+    let gid = find_root(&format!("/proc/{}/gid_map", pid))?;
     if uid == 0 && gid == 0 {
         return Ok(Box::new(|| {}));
     }
