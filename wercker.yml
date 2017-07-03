@@ -6,3 +6,12 @@ build:
     - script:
         name: build
         code: ./build.sh
+
+build-nightly:
+  box: scorpil/rust:nightly
+  steps:
+    - install-packages:
+        packages: build-essential
+    - script:
+        name: build
+        code: ./build.sh
