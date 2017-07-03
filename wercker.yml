@@ -1,6 +1,8 @@
-box: jimmycuadra/rust
+box: scorpil/rust:stable
 build:
   steps:
+    - install-packages:
+        packages: build-essential
     - script:
         name: build
         code: ./build.sh
