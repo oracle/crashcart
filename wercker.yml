@@ -1,0 +1,6 @@
+box: jimmycuadra/rust
+build:
+  steps:
+    - script:
+        name: build
+        code: ./build.sh
