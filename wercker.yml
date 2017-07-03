@@ -7,6 +7,18 @@ build:
         name: build
         code: ./build.sh
 
+build-musl:
+  box:
+    id: ekidd/rust-musl-builder:stable
+    cmd: /usr/bin/sudo -E /bin/bash
+  steps:
+    - script:
+        name: update path
+        code: export PATH=$PATH:/home/rust/.cargo/bin
+    - script:
+        name: build
+        code: TARGET=x86_64-unknown-linux-musl ./build.sh
+
 build-nightly:
   box: scorpil/rust:nightly
   steps:
