@@ -10,6 +10,8 @@ with linux binaries into an existing container.
 
 ## Building `crashcart` ##
 
+[![wercker status](https://app.wercker.com/status/3b1da922588f5550faca49a356013e52/s/master "wercker status")](https://app.wercker.com/project/byKey/3b1da922588f5550faca49a356013e52)
+
 Install rust:
 
     curl https://sh.rustup.rs -sSf | sh
