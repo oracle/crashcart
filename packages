@@ -5,6 +5,7 @@ curl
 gdb
 gnutar
 gzip
+lsof
 ltrace
 man
 netcat-gnu
