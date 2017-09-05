@@ -20,6 +20,7 @@ use glob::glob;
 use nix::c_int;
 use nix::fcntl::{open, OFlag, O_RDWR, O_CREAT, flock, FlockArg};
 use nix::mount::{mount, umount, MS_RDONLY, MsFlags};
+use nix::mount::{MS_REMOUNT, MS_NOSUID, MS_STRICTATIME};
 use nix::sched::{CloneFlags, CLONE_NEWUSER, CLONE_NEWNET, CLONE_NEWCGROUP};
 use nix::sched::{setns, CLONE_NEWNS, CLONE_NEWPID, CLONE_NEWIPC, CLONE_NEWUTS};
 use nix::sys::signal::{sigaction, kill};
@@ -30,7 +31,8 @@ use nix::unistd::{close, fork, ForkResult, execvp, setresgid, setresuid};
 use nix::Errno;
 use std::env;
 use std::fs::{read_link, create_dir_all, remove_file, remove_dir};
-use std::fs::{File, canonicalize};
+use std::fs::{File, canonicalize, metadata};
+use std::io::{BufRead, BufReader};
 use std::io::prelude::*;
 use std::os::unix::fs::symlink;
 use std::path::Path;
@@ -89,12 +91,36 @@ macro_rules! maybe {
 
 fn is_backing(devnr: i32, image: &str) -> bool {
     let path = format!("/sys/block/loop{}/loop/backing_file", devnr);
-    let mut f = maybe!(File::open(&path));
+    let mut f = maybe!(File::open(path));
     let mut backing = String::new();
     maybe!(f.read_to_string(&mut backing));
     let image_path = maybe!(canonicalize(&image));
     let backing_path = maybe!(canonicalize(&backing.trim()));
     image_path == backing_path
+}
+
+fn is_readonly_dev(pid: u64) -> bool {
+    let path = format!("/proc/{}/mounts", pid);
+    let f = maybe!(File::open(path));
+    for line in BufReader::new(f).lines() {
+        let l = match line {
+            Ok(l) => l,
+            Err(e) => {
+                warn!("failed to read mount info: {}", e);
+                return false;
+            }
+        };
+        let fields: Vec<&str> = l.split(' ').collect();
+        if fields.len() < 4 {
+            warn!("mount data is corrupted");
+            continue;
+        }
+        if fields[1] != "/dev" {
+            continue;
+        }
+        return fields[3].starts_with("ro");
+    }
+    false
 }
 
 fn make_device(image: &str) -> Result<i32> {
@@ -366,13 +392,31 @@ fn do_mount(pid: u64, image: &str) -> Result<()> {
     // if we are in a userns, make sure that we have the right fsids
     let reset_fsids = set_fsids(pid)?;
     defer!(reset_fsids());
+    let readonly = is_readonly_dev(pid);
     let exit_mount_ns = enter_mount_ns(pid)?;
     defer!(exit_mount_ns().unwrap());
 
-    // TODO: if /dev is marked ro, we need to remount it rw. The userns
-    //       must be entered first so don't mess up the permissions on
-    //       remount. We also need to place a sentinel file so we know
-    //       to remount it ro when we teardown the mount.
+    if readonly {
+        // TODO: The userns should be entered first so don't mess up the
+        //       permissions on remount.
+        if let Err(e) = mount(
+            Some("/dev"),
+            "/dev",
+            None::<&str>,
+            MS_REMOUNT | MS_NOSUID | MS_STRICTATIME,
+            None::<&str>,
+        )
+        {
+            if e.errno() != Errno::EBUSY {
+                warn!("could not remount dev read/write");
+            }
+        }
+        let sentinel = "/dev/readonly";
+        let fd = open(sentinel, O_RDWR | O_CREAT, Mode::from_bits_truncate(0o644))
+            .chain_err(|| format!("failed to open {}", sentinel))?;
+        close(fd).unwrap();
+
+    }
 
     // NOTE: the default dev device inside a user namespace can not hold
     //       loopback devices, so we create a new tmpfs mount from the
@@ -582,6 +626,24 @@ fn do_unmount_ns(pid: u64, devnr: i32) -> Result<()> {
         if e.kind() != std::io::ErrorKind::NotFound {
             let msg = format!("could not delete {}", CC_LOOP_TMP);
             Err(e).chain_err(|| msg)?;
+        }
+    }
+    let sentinel = "/dev/readonly";
+    if metadata(sentinel).is_ok() {
+        // TODO: The userns should be entered first so don't mess up the
+        //       permissions on remount.
+        remove_file(sentinel).unwrap();
+        if let Err(e) = mount(
+            Some("/dev"),
+            "/dev",
+            None::<&str>,
+            MS_REMOUNT | MS_RDONLY | MS_NOSUID | MS_STRICTATIME,
+            None::<&str>,
+        )
+        {
+            if e.errno() != Errno::EBUSY {
+                warn!("could not remount dev readonly");
+            }
         }
     }
     Ok(())
