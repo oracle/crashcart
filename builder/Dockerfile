@@ -16,7 +16,7 @@ RUN echo 'nixbld:x:998:nobody' >> /etc/group && \
     echo "${nsha}  nix-${nversion}.tar.bz2" | sha256sum -c && \
     tar -xjf nix-${nversion}.tar.bz2 && \
     sed -i '1i#include <string.h>' nix-${nversion}/src/libutil/affinity.cc && \
-    sed -i 's/#ifndef __CYGWIN__/#if 0/g' ${nversion}/src/libstore/build.cc  && \
+    sed -i 's/#ifndef __CYGWIN__/#if 0/g' nix-${nversion}/src/libstore/build.cc  && \
     cd nix-${nversion} && \
     ./configure --localstatedir=/dev/crashcart/var --with-store-dir=/dev/crashcart/store && \
     make && \
