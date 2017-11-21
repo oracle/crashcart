@@ -24,9 +24,3 @@ RUN echo 'nixbld:x:998:nobody' >> /etc/group && \
     cd - && \
     rm -rf nix-${nversion}* && \
     apk del gcc g++ make perl-dev libressl-dev libressl-dev bzip2-dev sqlite-dev curl-dev xz-dev libsodium-dev linux-headers
-# The symlink is because /dev is a tmpfs with limited space and the channel
-# command sticks some files in there. We mount over the symlink with a volume
-# during the full build.
-RUN ln -s /tmp /dev/crashcart
-RUN nix-channel --add https://nixos.org/channels/nixos-17.09 && \
-    nix-channel --update
