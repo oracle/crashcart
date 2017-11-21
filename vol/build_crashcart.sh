@@ -4,7 +4,7 @@ set -euo pipefail
 PACKAGES=${PACKAGES:-}
 
 cd /dev/crashcart/
-nix-channel --list | grep nixos-17.09 || nix-channel --add https://nixos.org/channels/nixos-17.09
+nix-channel --list | grep nixos-16.09 || nix-channel --add https://nixos.org/channels/nixos-16.09
 nix-channel --update
 rm -f profile
 nix-env -p profile -i ${PACKAGES}
