@@ -9,6 +9,9 @@ nix-channel --update
 # workaround issue with downloading gnutls via curl
 sed -i 's;ftp://ftp.gnutls.org;https://www.gnupg.org/ftp;g' \
     ~/.nix-defexpr/channels/nixos-17.09/pkgs/development/libraries/gnutls/*.nix
+# work around issue with sha256 of named.root
+sed -i 's;01n4bqf95kbvig1hahqzmmdkpn4v7mzfc1p944gq922i5j3fjr92;05nlfqvny1hy2kwaf03qb7bwcpxncfp6ds0b14symqgl9csziz1i;g' \
+    ~/.nix-defexpr/channels/nixos-17.09/pkgs/data/misc/dns-root-data/default.nix
 rm -f profile
 nix-env -p profile -i ${PACKAGES}
 rm -f crashcart.img
