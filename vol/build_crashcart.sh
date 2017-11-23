@@ -6,6 +6,9 @@ PACKAGES=${PACKAGES:-}
 cd /dev/crashcart/
 nix-channel --list | grep nixos-17.09 || nix-channel --add https://nixos.org/channels/nixos-17.09
 nix-channel --update
+# workaround issue with downloading gnutls via curl
+sed -i 's;ftp://ftp.gnutls.org;https://www.gnupg.org/ftp;g' \
+    ~/.nix-defexpr/channels/nixos-17.09/pkgs/development/libraries/gnutls/*.nix
 rm -f profile
 nix-env -p profile -i ${PACKAGES}
 rm -f crashcart.img
