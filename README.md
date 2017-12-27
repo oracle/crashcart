@@ -137,7 +137,7 @@ is in the init userns.
 `crashcart` is an open source project. See [CONTRIBUTING](CONTRIBUTING.md) for
 details.
 
-Oracle gratefully acknowledges the contributions to smith that have been made
+Oracle gratefully acknowledges the contributions to `crashcart` that have been made
 by the community.
 
 ## License ##
