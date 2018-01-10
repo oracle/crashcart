@@ -6,12 +6,13 @@ PACKAGES=${PACKAGES:-}
 cd /dev/crashcart/
 nix-channel --list | grep nixos-17.09 || nix-channel --add https://nixos.org/channels/nixos-17.09
 nix-channel --update
-# workaround issue with downloading gnutls via curl
-sed -i 's;ftp://ftp.gnutls.org;https://www.gnupg.org/ftp;g' \
-    ~/.nix-defexpr/channels/nixos-17.09/pkgs/development/libraries/gnutls/*.nix
-# work around issue with sha256 of named.root
-sed -i 's;01n4bqf95kbvig1hahqzmmdkpn4v7mzfc1p944gq922i5j3fjr92;05nlfqvny1hy2kwaf03qb7bwcpxncfp6ds0b14symqgl9csziz1i;g' \
-    ~/.nix-defexpr/channels/nixos-17.09/pkgs/data/misc/dns-root-data/default.nix
+
+# workaround for ncurses
+sed -i 's;20170902;20180106;g' \
+  ~/.nix-defexpr/channels/nixos-17.09/pkgs/development/libraries/ncurses/default.nix
+sed -i 's;1cks4gsz4148jw6wpqia4w5jx7cfxr29g2kmpvp0ssmvwczh8dr4;27a178398314b81c27d54672b42b6bb4475c77e72f126dbedde8f8bf220d081e;g' \
+  ~/.nix-defexpr/channels/nixos-17.09/pkgs/development/libraries/ncurses/default.nix
+
 rm -f profile
 nix-env -p profile -i ${PACKAGES}
 rm -f crashcart.img
