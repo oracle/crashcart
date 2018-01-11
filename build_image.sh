@@ -13,7 +13,7 @@ docker build -t crashcart-builder \
     --build-arg ftp_proxy="${ftp_proxy}" \
     builder
 
-docker run --privileged --rm -it \
+docker run --privileged --rm -i \
     -e "PACKAGES=${PACKAGES}" \
     -e http_proxy="${http_proxy}" \
     -e https_proxy="${https_proxy}" \
