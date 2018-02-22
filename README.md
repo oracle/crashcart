@@ -140,6 +140,12 @@ details.
 Oracle gratefully acknowledges the contributions to `crashcart` that have been made
 by the community.
 
+## Getting in touch ##
+
+The best way to get in touch is Slack.
+
+Join the [Crashcart channel](https://oraclecontainertools.slack.com/messages/C8CJ5M9ML) in the [Oracle Container Tools workspace](https://oraclecontainertools.slack.com).
+
 ## License ##
 
 Copyright (c) 2017, Oracle and/or its affiliates. All rights reserved.
